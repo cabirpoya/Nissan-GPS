@@ -1,0 +1,12 @@
+{
+  "name": "gps-api",
+  "version": "1.0.0",
+  "main": "gps_api.js",
+  "scripts": {
+    "start": "node gps_api.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+} 
