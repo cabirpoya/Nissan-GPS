@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarDetect Pro | GPS Vehicle Tracking System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Add Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+        /* Custom styles for map and animations */
+        .map-container {
+            height: 400px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .map-placeholder {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        
+        .vehicle-marker {
+            width: 20px;
+            height: 20px;
+            background-color: #3b82f6;
+            border-radius: 50%;
+            border: 3px solid white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+        
+        .status-indicator {
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        
+        .status-indicator:before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .status-active:before {
+            background-color: #10b981;
+        }
+        
+        .status-inactive:before {
+            background-color: #ef4444;
+        }
+        
+        .status-parking:before {
+            background-color: #f59e0b;
+        }
+        
+        .trip-history-item {
+            transition: all 0.2s ease;
+        }
+        
+        .trip-history-item:hover {
+            transform: translateX(5px);
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header/Navigation -->
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center">
+                <i class="fas fa-car text-blue-500 text-2xl mr-3"></i>
+                <h1 class="text-xl font-bold text-gray-800">CarDetect <span class="text-blue-500">Pro</span></h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:block">
+                    <div class="relative">
+                        <button class="flex items-center space-x-2 text-gray-600 hover:text-blue-500">
+                            <span class="font-medium">John D.</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div class="absolute hidden bg-white shadow-lg rounded-lg mt-2 right-0 w-48">
+                            <a href="#" class="block px-4 py-2 hover:bg-gray-100">My Profile</a>
+                            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Settings</a>
+                            <a href="#" class="block px-4 py-2 hover:bg-gray-100 text-red-500">Logout</a>
+                        </div>
+                    </div>
+                </div>
+                <button class="md:hidden text-gray-600">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Left Sidebar -->
+            <div class="w-full lg:w-1/4 space-y-6">
+                <!-- Vehicle Status Card -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Vehicle Status</h2>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">Tracking Status:</span>
+                            <span class="status-indicator status-active font-medium text-green-600">Active</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">Connection:</span>
+                            <span class="status-indicator status-active font-medium text-green-600">Stable</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">Battery Level:</span>
+                            <div class="flex items-center">
+                                <span class="font-medium mr-2">87%</span>
+                                <div class="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-green-500" style="width: 87%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">Last Update:</span>
+                            <span class="font-medium">2 min ago</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions Card -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="flex flex-col items-center justify-center p-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">
+                            <i class="fas fa-power-off text-xl mb-1"></i>
+                            <span class="text-sm">Toggle Power</span>
+                        </button>
+                        
+                        <button class="flex flex-col items-center justify-center p-3 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition">
+                            <i class="fas fa-map-marked-alt text-xl mb-1"></i>
+                            <span class="text-sm">Geofence</span>
+                        </button>
+                        
+                        <button class="flex flex-col items-center justify-center p-3 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition">
+                            <i class="fas fa-bell text-xl mb-1"></i>
+                            <span class="text-sm">Alerts</span>
+                        </button>
+                        
+                        <button class="flex flex-col items-center justify-center p-3 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition">
+                            <i class="fas fa-history text-xl mb-1"></i>
+                            <span class="text-sm">History</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Alerts Card -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">Recent Alerts</h2>
+                        <span class="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">2 New</span>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 mt-1">
+                                <i class="fas fa-exclamation-circle text-red-500"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-800">Geofence Alert</p>
+                                <p class="text-xs text-gray-500">Vehicle moved beyond set boundary</p>
+                                <p class="text-xs text-gray-400 mt-1">10:42 AM Today</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 mt-1">
+                                <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-800">Low Battery Warning</p>
+                                <p class="text-xs text-gray-500">Battery level below 20%</p>
+                                <p class="text-xs text-gray-400 mt-1">Yesterday, 4:15 PM</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <div class="w-full lg:w-3/4 space-y-6">
+                <!-- Dashboard Header -->
+                <div class="bg-white rounded-xl shadow-sm p-6 flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Tracking Dashboard</h2>
+                        <p class="text-gray-600">Real-time monitoring for your vehicle</p>
+                    </div>
+                    
+                    <div class="mt-4 md:mt-0">
+                        <div class="flex items-center space-x-2">
+                            <div class="relative">
+                                <select id="vehicle-select" class="appearance-none bg-gray-100 border border-gray-200 rounded-lg px-4 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option>Select Vehicle</option>
+                                    <option selected>Toyota Camry (AB-1234)</option>
+                                    <option>Honda Accord (CD-5678)</option>
+                                    <option>Nissan Juke 2012 (JK-9012)</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                    <i class="fas fa-chevron-down text-xs"></i>
+                                </div>
+                            </div>
+                            
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                                <i class="fas fa-sync-alt mr-2"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Map Container -->
+                <div class="map-container" style="height: 400px; border-radius: 1rem; overflow: hidden;">
+                    <div id="map" style="width: 100%; height: 100%;"></div>
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white rounded-xl shadow-sm p-5">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-lg bg-blue-50 text-blue-500 mr-4">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Current Speed</p>
+                                <p class="text-xl font-bold text-gray-800">32 <span class="text-sm font-normal">mph</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-5">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-lg bg-green-50 text-green-500 mr-4">
+                                <i class="fas fa-road"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Today's Mileage</p>
+                                <p class="text-xl font-bold text-gray-800">52.3 <span class="text-sm font-normal">mi</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-5">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-lg bg-purple-50 text-purple-500 mr-4">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Active Duration</p>
+                                <p class="text-xl font-bold text-gray-800">2h 15m</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Trip History -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Recent Trips</h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start/End</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr class="trip-history-item hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Today</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <div>Home → Office</div>
+                                        <div class="text-xs text-gray-400">10:15 AM - 10:42 AM</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8.7 mi</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">27 min</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-blue-500 hover:text-blue-700"><i class="fas fa-eye mr-1"></i> View</button>
+                                    </td>
+                                </tr>
+                                <tr class="trip-history-item hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Yesterday</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <div>Office → Client</div>
+                                        <div class="text-xs text-gray-400">2:30 PM - 3:15 PM</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15.2 mi</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">45 min</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-blue-500 hover:text-blue-700"><i class="fas fa-eye mr-1"></i> View</button>
+                                    </td>
+                                </tr>
+                                <tr class="trip-history-item hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Jul 12, 2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <div>Home → Mall</div>
+                                        <div class="text-xs text-gray-400">6:00 PM - 6:40 PM</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">12.5 mi</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">40 min</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-blue-500 hover:text-blue-700"><i class="fas fa-eye mr-1"></i> View</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-end">
+                        <button class="text-blue-500 text-sm font-medium hover:text-blue-700">
+                            View All Trips <i class="fas fa-arrow-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-12">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center">
+                        <i class="fas fa-car text-blue-500 text-xl mr-2"></i>
+                        <span class="text-lg font-semibold">CarDetect Pro</span>
+                    </div>
+                    <p class="text-gray-500 text-sm mt-1">Advanced GPS Vehicle Tracking Solution</p>
+                </div>
+                
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-500 hover:text-blue-500"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="text-gray-500 hover:text-blue-500"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="text-gray-500 hover:text-blue-500"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="text-gray-500 hover:text-blue-500"><i class="fab fa-linkedin-in"></i></a>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-200 mt-6 pt-6 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-500 text-sm mb-4 md:mb-0">© 2023 CarDetect Pro. All rights reserved.</p>
+                
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-500 hover:text-blue-500 text-sm">Privacy Policy</a>
+                    <a href="#" class="text-gray-500 hover:text-blue-500 text-sm">Terms of Service</a>
+                    <a href="#" class="text-gray-500 hover:text-blue-500 text-sm">Contact Us</a>
+                    <a href="#" class="text-gray-500 hover:text-blue-500 text-sm">Support</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Simple JavaScript for dropdown functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // User dropdown toggle
+            const userButton = document.querySelector('.flex.items-center.space-x-2');
+            const userDropdown = document.querySelector('.absolute.hidden.bg-white');
+            
+            if (userButton && userDropdown) {
+                userButton.addEventListener('click', function() {
+                    userDropdown.classList.toggle('hidden');
+                });
+            }
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                if (userDropdown && !userDropdown.contains(event.target) && 
+                    !userButton.contains(event.target)) {
+                    userDropdown.classList.add('hidden');
+                }
+            });
+            
+            // --- Leaflet Map Integration ---
+            // Center on Afghanistan (Kabul: 34.5553, 69.2075)
+            var map = L.map('map').setView([34.5553, 69.2075], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            // Vehicle locations (example coordinates)
+            var vehicles = {
+                'Toyota Camry (AB-1234)': { coords: [34.5553, 69.2075], popup: 'Toyota Camry (AB-1234) - Kabul' },
+                'Honda Accord (CD-5678)': { coords: [36.7280, 68.8725], popup: 'Honda Accord (CD-5678) - Kunduz' },
+                'Nissan Juke 2012 (JK-9012)': { coords: [33.6772, 65.6900], popup: 'Nissan Juke 2012 (JK-9012) - Ghazni' }
+            };
+            // Default marker (Toyota Camry)
+            var currentVehicle = 'Toyota Camry (AB-1234)';
+            var vehicleMarker = L.marker(vehicles[currentVehicle].coords).addTo(map)
+                .bindPopup(vehicles[currentVehicle].popup)
+                .openPopup();
+            // Vehicle select dropdown
+            var vehicleSelect = document.getElementById('vehicle-select');
+            vehicleSelect.addEventListener('change', function() {
+                var selected = vehicleSelect.options[vehicleSelect.selectedIndex].text;
+                if (vehicles[selected]) {
+                    vehicleMarker.setLatLng(vehicles[selected].coords)
+                        .setPopupContent(vehicles[selected].popup)
+                        .openPopup();
+                    map.setView(vehicles[selected].coords, 8);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
